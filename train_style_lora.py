@@ -81,7 +81,11 @@ def train():
     text_encoder.requires_grad_(False)
 
     dataset = StyleDataset(STYLE_DIR)
-    loader = DataLoader(dataset, batch_size=SUBJECT_BATCH_SIZE, shuffle=True)
+
+    def collate_fn(batch):
+        return {"image": [b["image"] for b in batch], "caption": [b["caption"] for b in batch]}
+
+    loader = DataLoader(dataset, batch_size=SUBJECT_BATCH_SIZE, shuffle=True, collate_fn=collate_fn)
 
     optimizer = torch.optim.AdamW(
         transformer.parameters(), lr=STYLE_LR, weight_decay=1e-2,

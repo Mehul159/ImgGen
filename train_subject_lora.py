@@ -109,7 +109,11 @@ def train():
     tokenizer, text_encoder = setup_pivotal_tuning(pipe)
 
     dataset = DreamBoothDataset(PROCESSED_DIR)
-    loader = DataLoader(dataset, batch_size=SUBJECT_BATCH_SIZE, shuffle=True)
+
+    def collate_fn(batch):
+        return {"image": [b["image"] for b in batch], "caption": [b["caption"] for b in batch]}
+
+    loader = DataLoader(dataset, batch_size=SUBJECT_BATCH_SIZE, shuffle=True, collate_fn=collate_fn)
 
     trainable_params = (
         list(transformer.parameters())

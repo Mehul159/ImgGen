@@ -71,21 +71,27 @@ def setup_lora(transformer):
 
 
 def setup_pivotal_tuning(pipe):
-    """Add trigger token to tokenizer and unfreeze its embedding."""
+    """Add trigger token to both tokenizers; unfreeze first encoder's embedding."""
     tokenizer = pipe.tokenizer
     text_encoder = pipe.text_encoder
+    tokenizer_2 = pipe.tokenizer_2
+    text_encoder_2 = pipe.text_encoder_2
 
     num_added = tokenizer.add_tokens([TRIGGER_TOKEN])
     text_encoder.resize_token_embeddings(len(tokenizer))
     token_id = tokenizer.convert_tokens_to_ids(TRIGGER_TOKEN)
     print(f"Added {num_added} token(s), trigger ID = {token_id}")
 
+    tokenizer_2.add_tokens([TRIGGER_TOKEN])
+    text_encoder_2.resize_token_embeddings(len(tokenizer_2))
+
     for name, param in text_encoder.named_parameters():
         param.requires_grad = (
             name == "text_model.embeddings.token_embedding.weight"
         )
+    text_encoder_2.requires_grad_(False)
 
-    return tokenizer, text_encoder
+    return tokenizer, text_encoder, tokenizer_2, text_encoder_2
 
 
 def train():
@@ -106,7 +112,7 @@ def train():
     transformer = setup_lora(transformer)
     if hasattr(pipe.unet, "enable_gradient_checkpointing"):
         pipe.unet.enable_gradient_checkpointing()
-    tokenizer, text_encoder = setup_pivotal_tuning(pipe)
+    tokenizer, text_encoder, tokenizer_2, text_encoder_2 = setup_pivotal_tuning(pipe)
 
     dataset = DreamBoothDataset(PROCESSED_DIR)
 
@@ -127,6 +133,7 @@ def train():
 
     vae = pipe.vae.to(accelerator.device, dtype=torch.bfloat16)
     vae.requires_grad_(False)
+    text_encoder_2 = text_encoder_2.to(accelerator.device, dtype=torch.bfloat16)
 
     print(f"\nStarting training: {SUBJECT_STEPS} steps, batch={SUBJECT_BATCH_SIZE}, "
           f"grad_accum={SUBJECT_GRAD_ACCUM}")
@@ -146,15 +153,27 @@ def train():
                     * vae.config.scaling_factor
                 )
 
-                input_ids = tokenizer(
-                    batch["caption"],
-                    padding="max_length",
-                    truncation=True,
-                    max_length=77,
-                    return_tensors="pt",
+                input_ids_1 = tokenizer(
+                    batch["caption"], padding="max_length",
+                    truncation=True, max_length=77, return_tensors="pt",
+                ).input_ids.to(accelerator.device)
+                input_ids_2 = tokenizer_2(
+                    batch["caption"], padding="max_length",
+                    truncation=True, max_length=77, return_tensors="pt",
                 ).input_ids.to(accelerator.device)
 
-                encoder_hidden_states = text_encoder(input_ids)[0]
+                enc_out_1 = text_encoder(input_ids_1, output_hidden_states=True)
+                enc_out_2 = text_encoder_2(input_ids_2, output_hidden_states=True)
+                encoder_hidden_states = torch.cat([
+                    enc_out_1.hidden_states[-2],
+                    enc_out_2.hidden_states[-2],
+                ], dim=-1)
+                pooled_prompt_embeds = enc_out_2[0]
+
+                add_time_ids = torch.tensor(
+                    [[1024.0, 1024.0, 0.0, 0.0, 1024.0, 1024.0]],
+                    device=accelerator.device, dtype=latents.dtype,
+                ).repeat(latents.shape[0], 1)
 
                 noise = torch.randn_like(latents)
                 timesteps = torch.randint(
@@ -166,6 +185,10 @@ def train():
                     noisy_latents,
                     timestep=timesteps,
                     encoder_hidden_states=encoder_hidden_states,
+                    added_cond_kwargs={
+                        "text_embeds": pooled_prompt_embeds.to(dtype=latents.dtype),
+                        "time_ids": add_time_ids,
+                    },
                 ).sample
 
                 loss = torch.nn.functional.mse_loss(pred.float(), noise.float())

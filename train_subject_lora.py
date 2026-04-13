@@ -136,10 +136,8 @@ def train():
         for batch in loader:
             with accelerator.accumulate(transformer):
                 images = [img for img in batch["image"]]
-                pixel_values = torch.stack([
+                pixel_values = torch.cat([
                     pipe.image_processor.preprocess(img)
-                    if hasattr(pipe, "image_processor")
-                    else torch.tensor([])
                     for img in images
                 ]).to(accelerator.device, dtype=torch.bfloat16)
 

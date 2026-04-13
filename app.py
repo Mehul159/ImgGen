@@ -82,12 +82,12 @@ def generate_animation_ui(prompt, num_frames, steps, guidance, seed):
     from diffusers.utils import export_to_gif
     from video_animatediff import download_animatediff, ANIMATEDIFF_ADAPTER_PATH, ANIMATEDIFF_LORA_PATH
     from diffusers import AnimateDiffPipeline, MotionAdapter, DDIMScheduler
-    from configs.default import SDXL_PATH, SUBJECT_LORA_PATH
+    from configs.default import SDXL_PATH, SDXL_HUB_ID, resolve_model, SUBJECT_LORA_PATH
 
     download_animatediff()
     adapter = MotionAdapter.from_pretrained(str(ANIMATEDIFF_ADAPTER_PATH))
     pipe = AnimateDiffPipeline.from_pretrained(
-        str(SDXL_PATH), motion_adapter=adapter, torch_dtype=torch.float16,
+        resolve_model(SDXL_PATH, SDXL_HUB_ID), motion_adapter=adapter, torch_dtype=torch.float16,
     )
     pipe.scheduler = DDIMScheduler.from_config(
         pipe.scheduler.config, beta_schedule="linear",

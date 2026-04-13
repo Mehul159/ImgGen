@@ -19,7 +19,8 @@ from diffusers import StableDiffusionXLPipeline
 from diffusers.utils import load_image
 from huggingface_hub import hf_hub_download
 from configs.default import (
-    SDXL_PATH, SUBJECT_LORA_PATH, PROCESSED_DIR, OUTPUT_DIR,
+    SDXL_PATH, SDXL_HUB_ID, resolve_model,
+    SUBJECT_LORA_PATH, PROCESSED_DIR, OUTPUT_DIR,
     MODEL_DIR, TRIGGER_TOKEN, ENABLE_CPU_OFFLOAD, DEFAULT_STEPS, DEFAULT_SEED,
 )
 
@@ -53,7 +54,7 @@ def run_inference():
 
     print("Loading SDXL pipeline…")
     pipe = StableDiffusionXLPipeline.from_pretrained(
-        str(SDXL_PATH), torch_dtype=torch.float16,
+        resolve_model(SDXL_PATH, SDXL_HUB_ID), torch_dtype=torch.float16,
     )
 
     if ENABLE_CPU_OFFLOAD:

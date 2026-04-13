@@ -19,7 +19,8 @@ import torch
 import cv2
 import numpy as np
 from configs.default import (
-    SDXL_PATH, SUBJECT_LORA_PATH, TRIGGER_TOKEN, ENABLE_CPU_OFFLOAD,
+    SDXL_PATH, SDXL_HUB_ID, resolve_model,
+    SUBJECT_LORA_PATH, TRIGGER_TOKEN, ENABLE_CPU_OFFLOAD,
 )
 
 
@@ -30,7 +31,7 @@ def run_stream():
 
     print("Loading SDXL img2img pipeline…")
     pipe = AutoPipelineForImage2Image.from_pretrained(
-        str(SDXL_PATH), torch_dtype=torch.float16,
+        resolve_model(SDXL_PATH, SDXL_HUB_ID), torch_dtype=torch.float16,
     ).to("cuda")
 
     if SUBJECT_LORA_PATH.exists():

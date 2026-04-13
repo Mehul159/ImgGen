@@ -20,7 +20,8 @@ from torch.utils.data import DataLoader, Dataset
 from accelerate import Accelerator
 from peft import LoraConfig, get_peft_model
 from configs.default import (
-    FLUX_PATH, SDXL_PATH, PROCESSED_DIR, SUBJECT_LORA_PATH,
+    SDXL_PATH, SDXL_HUB_ID, resolve_model,
+    PROCESSED_DIR, SUBJECT_LORA_PATH,
     TRIGGER_TOKEN, SUBJECT_LORA_RANK, SUBJECT_LORA_ALPHA,
     SUBJECT_LR, SUBJECT_STEPS, SUBJECT_BATCH_SIZE, SUBJECT_GRAD_ACCUM,
 )
@@ -42,25 +43,14 @@ class DreamBoothDataset(Dataset):
 
 
 def load_pipeline():
-    """Load FLUX.1-dev if available, else fall back to SDXL."""
-    if FLUX_PATH.exists() and any(FLUX_PATH.iterdir()):
-        print(f"Loading FLUX.1-dev from {FLUX_PATH}…")
-        from diffusers import FluxPipeline
-        pipe = FluxPipeline.from_pretrained(
-            str(FLUX_PATH), torch_dtype=torch.bfloat16,
-        )
-        return pipe, "flux"
-    elif SDXL_PATH.exists() and any(SDXL_PATH.iterdir()):
-        print(f"Loading SDXL from {SDXL_PATH}…")
-        from diffusers import StableDiffusionXLPipeline
-        pipe = StableDiffusionXLPipeline.from_pretrained(
-            str(SDXL_PATH), torch_dtype=torch.bfloat16,
-        )
-        return pipe, "sdxl"
-    else:
-        raise FileNotFoundError(
-            "No base model found. Run scripts/download_models.py first."
-        )
+    """Load SDXL from local path or HuggingFace Hub."""
+    src = resolve_model(SDXL_PATH, SDXL_HUB_ID)
+    print(f"Loading SDXL from {src}…")
+    from diffusers import StableDiffusionXLPipeline
+    pipe = StableDiffusionXLPipeline.from_pretrained(
+        src, torch_dtype=torch.bfloat16,
+    )
+    return pipe, "sdxl"
 
 
 def setup_lora(transformer):

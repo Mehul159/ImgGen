@@ -1,96 +1,61 @@
 """
-Phase 2 — Download base models from Hugging Face.
+Phase 2 — Verify / pre-warm model cache.
 
-Models:
-  - black-forest-labs/FLUX.1-dev           → primary DiT model (requires license)
-  - stabilityai/stable-diffusion-xl-base-1.0 → SDXL fallback
-  - madebyollin/sdxl-vae-fp16-fix         → SDXL VAE (prevents washed colours)
-  - THUDM/CogVideoX-5b                    → video generation
+Models are loaded from HuggingFace Hub on demand (no bulk download).
+This script optionally pre-warms the HF cache so later phases don't
+wait for downloads. Only SDXL is used — FLUX and CogVideoX are too
+large for Kaggle/Colab disk limits.
+
+Estimated disk usage:
+  SDXL base (fp16 safetensors) : ~6.5 GB (in HF cache)
+  SDXL VAE fix                 : ~150 MB
+  Total                        : ~7 GB
 """
 
 import sys, os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from huggingface_hub import snapshot_download
-from configs.default import FLUX_PATH, SDXL_PATH, SDXL_VAE_PATH, COGVIDEO_PATH
-
-
-def download_flux():
-    if FLUX_PATH.exists() and any(FLUX_PATH.iterdir()):
-        print(f"[skip] FLUX.1-dev already at {FLUX_PATH}")
-        return
-    print("[1/4] Downloading FLUX.1-dev (requires license acceptance)…")
-    print("       Accept license at: https://huggingface.co/black-forest-labs/FLUX.1-dev")
-    snapshot_download(
-        repo_id="black-forest-labs/FLUX.1-dev",
-        local_dir=str(FLUX_PATH),
-        ignore_patterns=["*.gguf"],
-    )
-    print(f"  → Saved to {FLUX_PATH}")
-
-
-def download_sdxl():
-    if SDXL_PATH.exists() and any(SDXL_PATH.iterdir()):
-        print(f"[skip] SDXL 1.0 already at {SDXL_PATH}")
-        return
-    print("[2/4] Downloading SDXL 1.0 base…")
-    snapshot_download(
-        repo_id="stabilityai/stable-diffusion-xl-base-1.0",
-        local_dir=str(SDXL_PATH),
-    )
-    print(f"  → Saved to {SDXL_PATH}")
-
-
-def download_sdxl_vae():
-    if SDXL_VAE_PATH.exists() and any(SDXL_VAE_PATH.iterdir()):
-        print(f"[skip] SDXL VAE fix already at {SDXL_VAE_PATH}")
-        return
-    print("[3/4] Downloading SDXL VAE fp16 fix…")
-    snapshot_download(
-        repo_id="madebyollin/sdxl-vae-fp16-fix",
-        local_dir=str(SDXL_VAE_PATH),
-    )
-    print(f"  → Saved to {SDXL_VAE_PATH}")
-
-
-def download_cogvideo():
-    if COGVIDEO_PATH.exists() and any(COGVIDEO_PATH.iterdir()):
-        print(f"[skip] CogVideoX-5b already at {COGVIDEO_PATH}")
-        return
-    print("[4/4] Downloading CogVideoX-5b…")
-    snapshot_download(
-        repo_id="THUDM/CogVideoX-5b",
-        local_dir=str(COGVIDEO_PATH),
-    )
-    print(f"  → Saved to {COGVIDEO_PATH}")
+from configs.default import (
+    SDXL_PATH, SDXL_VAE_PATH,
+    SDXL_HUB_ID, SDXL_VAE_HUB_ID,
+    resolve_model,
+)
 
 
 def verify():
-    all_ok = True
-    for name, path in [
-        ("FLUX.1-dev", FLUX_PATH),
-        ("SDXL-base", SDXL_PATH),
-        ("SDXL-VAE-fix", SDXL_VAE_PATH),
-        ("CogVideoX-5b", COGVIDEO_PATH),
-    ]:
-        exists = path.exists() and any(path.iterdir()) if path.exists() else False
-        status = "OK" if exists else "MISSING"
-        print(f"  [{status}] {name}: {path}")
-        if not exists:
-            all_ok = False
-    return all_ok
+    print("── Model Status ──")
+    sdxl_src = resolve_model(SDXL_PATH, SDXL_HUB_ID)
+    vae_src = resolve_model(SDXL_VAE_PATH, SDXL_VAE_HUB_ID)
+    is_local_sdxl = sdxl_src == str(SDXL_PATH)
+    is_local_vae = vae_src == str(SDXL_VAE_PATH)
+    print(f"  SDXL base  : {'LOCAL ' + str(SDXL_PATH) if is_local_sdxl else 'HUB ' + SDXL_HUB_ID}")
+    print(f"  SDXL VAE   : {'LOCAL ' + str(SDXL_VAE_PATH) if is_local_vae else 'HUB ' + SDXL_VAE_HUB_ID}")
+    print()
+    print("Models will be downloaded from HuggingFace Hub on first use.")
+    print("No bulk download needed — this saves ~100 GB of disk space.")
+
+
+def prewarm():
+    """Pre-download SDXL into HF cache (optional, saves time in later phases)."""
+    from huggingface_hub import snapshot_download
+    print("Pre-warming SDXL in HF cache (fp16 safetensors only)…")
+    snapshot_download(
+        repo_id=SDXL_HUB_ID,
+        allow_patterns=["*.safetensors", "*.json", "*.txt"],
+        ignore_patterns=["*.bin", "*.ckpt", "*.msgpack"],
+    )
+    print("  SDXL cached.")
+    snapshot_download(
+        repo_id=SDXL_VAE_HUB_ID,
+        allow_patterns=["*.safetensors", "*.json", "*.txt"],
+    )
+    print("  SDXL VAE cached.")
+    print("\nPre-warm complete. Models ready for instant loading.")
 
 
 if __name__ == "__main__":
-    download_flux()
-    download_sdxl()
-    download_sdxl_vae()
-    download_cogvideo()
-
-    print("\n── Verification ──")
-    if verify():
-        print("\nAll models downloaded successfully.")
+    if "--prewarm" in sys.argv:
+        prewarm()
     else:
-        print("\nSome models are missing. Check errors above.")
-        print("Note: FLUX.1-dev requires license acceptance at HuggingFace.")
+        verify()

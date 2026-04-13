@@ -15,7 +15,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 import torch
 from pathlib import Path
 from configs.default import (
-    FLUX_PATH, SDXL_PATH, SUBJECT_LORA_PATH, STYLE_LORA_PATH,
+    SDXL_PATH, SDXL_HUB_ID, resolve_model,
+    SUBJECT_LORA_PATH, STYLE_LORA_PATH,
     OUTPUT_DIR, ENABLE_CPU_OFFLOAD, DEFAULT_STEPS, DEFAULT_GUIDANCE, DEFAULT_SEED,
 )
 
@@ -27,29 +28,16 @@ class LoRAEngine:
     }
 
     def __init__(self, model_path: str | Path | None = None):
-        model_path = Path(model_path) if model_path else None
-
-        if model_path and model_path.exists() and any(model_path.iterdir()):
-            chosen = model_path
-        elif FLUX_PATH.exists() and any(FLUX_PATH.iterdir()):
-            chosen = FLUX_PATH
-        elif SDXL_PATH.exists() and any(SDXL_PATH.iterdir()):
-            chosen = SDXL_PATH
+        if model_path:
+            chosen = str(model_path)
         else:
-            raise FileNotFoundError("No base model found.")
+            chosen = resolve_model(SDXL_PATH, SDXL_HUB_ID)
 
         print(f"Loading pipeline from {chosen}…")
-
-        if "flux" in str(chosen).lower():
-            from diffusers import FluxPipeline
-            self.pipe = FluxPipeline.from_pretrained(
-                str(chosen), torch_dtype=torch.bfloat16,
-            )
-        else:
-            from diffusers import StableDiffusionXLPipeline
-            self.pipe = StableDiffusionXLPipeline.from_pretrained(
-                str(chosen), torch_dtype=torch.float16,
-            )
+        from diffusers import StableDiffusionXLPipeline
+        self.pipe = StableDiffusionXLPipeline.from_pretrained(
+            chosen, torch_dtype=torch.float16,
+        )
 
         if ENABLE_CPU_OFFLOAD:
             self.pipe.enable_model_cpu_offload()

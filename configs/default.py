@@ -17,16 +17,18 @@ VIDEO_DIR = DATA_DIR / "video_clips"
 PROCESSED_DIR = DATA_DIR / "processed"
 
 MODEL_DIR = ROOT / "models"
-FLUX_PATH = MODEL_DIR / "flux1-dev"
 SDXL_PATH = MODEL_DIR / "sdxl-base"
 SDXL_VAE_PATH = MODEL_DIR / "sdxl-vae-fix"
-COGVIDEO_PATH = MODEL_DIR / "cogvideox-5b"
 
 LORA_DIR = ROOT / "lora_weights"
 SUBJECT_LORA_PATH = LORA_DIR / "subject_lora"
 STYLE_LORA_PATH = LORA_DIR / "style_lora"
 
 OUTPUT_DIR = ROOT / "outputs"
+
+# ── Hub Model IDs (loaded on demand, no bulk download) ─────
+SDXL_HUB_ID = "stabilityai/stable-diffusion-xl-base-1.0"
+SDXL_VAE_HUB_ID = "madebyollin/sdxl-vae-fp16-fix"
 
 # ── Training ───────────────────────────────────────────────
 TRIGGER_TOKEN = "sks person"
@@ -53,3 +55,10 @@ DEFAULT_SEED = 42
 DTYPE = "bfloat16"  # "float16" for older GPUs
 ENABLE_CPU_OFFLOAD = True  # enable for <16GB VRAM
 ENABLE_SEQUENTIAL_OFFLOAD = False  # enable for <8GB VRAM
+
+
+def resolve_model(local_path: Path, hub_id: str) -> str:
+    """Return local path if it exists, otherwise the hub ID for from_pretrained()."""
+    if local_path.exists() and any(local_path.iterdir()):
+        return str(local_path)
+    return hub_id

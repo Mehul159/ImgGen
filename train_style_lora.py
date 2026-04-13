@@ -18,7 +18,8 @@ from datasets import load_from_disk
 from accelerate import Accelerator
 from peft import LoraConfig, get_peft_model
 from configs.default import (
-    FLUX_PATH, SDXL_PATH, STYLE_DIR, STYLE_LORA_PATH,
+    SDXL_PATH, SDXL_HUB_ID, resolve_model,
+    STYLE_DIR, STYLE_LORA_PATH,
     STYLE_TRIGGER, STYLE_LORA_RANK, STYLE_LORA_ALPHA,
     STYLE_LR, STYLE_STEPS, SUBJECT_BATCH_SIZE, SUBJECT_GRAD_ACCUM,
 )
@@ -40,22 +41,13 @@ class StyleDataset(Dataset):
 
 
 def load_pipeline():
-    if FLUX_PATH.exists() and any(FLUX_PATH.iterdir()):
-        from diffusers import FluxPipeline
-        pipe = FluxPipeline.from_pretrained(
-            str(FLUX_PATH), torch_dtype=torch.bfloat16,
-        )
-        return pipe, "flux"
-    elif SDXL_PATH.exists() and any(SDXL_PATH.iterdir()):
-        from diffusers import StableDiffusionXLPipeline
-        pipe = StableDiffusionXLPipeline.from_pretrained(
-            str(SDXL_PATH), torch_dtype=torch.bfloat16,
-        )
-        return pipe, "sdxl"
-    else:
-        raise FileNotFoundError(
-            "No base model found. Run scripts/download_models.py first."
-        )
+    src = resolve_model(SDXL_PATH, SDXL_HUB_ID)
+    print(f"Loading SDXL from {src}…")
+    from diffusers import StableDiffusionXLPipeline
+    pipe = StableDiffusionXLPipeline.from_pretrained(
+        src, torch_dtype=torch.bfloat16,
+    )
+    return pipe, "sdxl"
 
 
 def train():

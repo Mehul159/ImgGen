@@ -16,7 +16,8 @@ import torch
 from pathlib import Path
 from huggingface_hub import snapshot_download
 from configs.default import (
-    SDXL_PATH, SUBJECT_LORA_PATH, MODEL_DIR, OUTPUT_DIR,
+    SDXL_PATH, SDXL_HUB_ID, resolve_model,
+    SUBJECT_LORA_PATH, MODEL_DIR, OUTPUT_DIR,
     ENABLE_CPU_OFFLOAD, TRIGGER_TOKEN,
 )
 
@@ -51,7 +52,7 @@ def generate_animation():
     adapter = MotionAdapter.from_pretrained(str(ANIMATEDIFF_ADAPTER_PATH))
 
     pipe = AnimateDiffPipeline.from_pretrained(
-        str(SDXL_PATH),
+        resolve_model(SDXL_PATH, SDXL_HUB_ID),
         motion_adapter=adapter,
         torch_dtype=torch.float16,
     )

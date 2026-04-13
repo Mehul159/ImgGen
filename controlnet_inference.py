@@ -23,7 +23,8 @@ from diffusers import (
 )
 from controlnet_aux import OpenposeDetector, CannyDetector, MidasDetector
 from configs.default import (
-    SDXL_PATH, SDXL_VAE_PATH, SUBJECT_LORA_PATH, STYLE_LORA_PATH,
+    SDXL_PATH, SDXL_VAE_PATH, SDXL_HUB_ID, SDXL_VAE_HUB_ID, resolve_model,
+    SUBJECT_LORA_PATH, STYLE_LORA_PATH,
     PROCESSED_DIR, OUTPUT_DIR, TRIGGER_TOKEN, STYLE_TRIGGER,
     ENABLE_CPU_OFFLOAD, DEFAULT_STEPS, DEFAULT_SEED,
 )
@@ -48,10 +49,10 @@ def load_controlnets():
 def build_pipeline(controlnets):
     print("Building SDXL ControlNet pipeline…")
     vae = AutoencoderKL.from_pretrained(
-        str(SDXL_VAE_PATH), torch_dtype=torch.float16,
+        resolve_model(SDXL_VAE_PATH, SDXL_VAE_HUB_ID), torch_dtype=torch.float16,
     )
     pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
-        str(SDXL_PATH),
+        resolve_model(SDXL_PATH, SDXL_HUB_ID),
         controlnet=controlnets,
         vae=vae,
         torch_dtype=torch.float16,

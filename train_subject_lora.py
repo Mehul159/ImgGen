@@ -104,7 +104,8 @@ def train():
         transformer = pipe.unet
 
     transformer = setup_lora(transformer)
-    transformer.gradient_checkpointing_enable()
+    if hasattr(pipe.unet, "enable_gradient_checkpointing"):
+        pipe.unet.enable_gradient_checkpointing()
     tokenizer, text_encoder = setup_pivotal_tuning(pipe)
 
     dataset = DreamBoothDataset(PROCESSED_DIR)

@@ -73,7 +73,8 @@ def train():
     )
     transformer = get_peft_model(transformer, lora_cfg)
     transformer.print_trainable_parameters()
-    transformer.gradient_checkpointing_enable()
+    if hasattr(pipe.unet, "enable_gradient_checkpointing"):
+        pipe.unet.enable_gradient_checkpointing()
 
     tokenizer = pipe.tokenizer
     text_encoder = pipe.text_encoder

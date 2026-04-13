@@ -67,8 +67,14 @@ def download_controlnet_pairs():
     if CONTROLNET_DIR.exists() and any(CONTROLNET_DIR.iterdir()):
         print(f"[skip] ControlNet dataset already at {CONTROLNET_DIR}")
         return
-    print("[4/4] Downloading ControlNet conditioning pairs…")
-    ds = load_dataset("poloclub/diffusiondb", "2m_first_1k", split="train", trust_remote_code=True)
+    print("[4/4] Downloading ControlNet conditioning pairs (LAION-Art)…")
+    stream = load_dataset("laion/laion-art", split="train", streaming=True)
+    subset = list(stream.take(1000))
+
+    from datasets import Dataset, Features, Value, Image as HFImage
+    features = Features({"url": Value("string"), "text": Value("string")})
+    rows = [{"url": s.get("URL", ""), "text": s.get("TEXT", "")} for s in subset if s.get("URL")]
+    ds = Dataset.from_list(rows, features=features)
     ds.save_to_disk(str(CONTROLNET_DIR))
     print(f"  → Saved {len(ds)} samples to {CONTROLNET_DIR}")
 

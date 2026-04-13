@@ -68,7 +68,7 @@ def download_controlnet_pairs():
         print(f"[skip] ControlNet dataset already at {CONTROLNET_DIR}")
         return
     print("[4/5] Downloading ControlNet conditioning pairs…")
-    ds = load_dataset("HighCWu/diffusion-db-2m-first-1k", split="train")
+    ds = load_dataset("poloclub/diffusiondb", "2m_first_1k", split="train")
     ds.save_to_disk(str(CONTROLNET_DIR))
     print(f"  → Saved {len(ds)} samples to {CONTROLNET_DIR}")
 
